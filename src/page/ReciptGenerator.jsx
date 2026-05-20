@@ -30,6 +30,7 @@ export default function ReceiptGenerator() {
     currencySymbol: "₹",
     comment: "Thank you for visiting. We hope to serve you again soon.",
     fileName: "Restaurant Bill Template 1",
+    isTermsChecked: true
   });
 
   // Dynamic Items list state
@@ -51,7 +52,8 @@ export default function ReceiptGenerator() {
     formData.restaurantName.trim() !== "" &&
     formData.customerName.trim() !== "" &&
     formData.orderType.trim() !== "" &&
-    formData.fileName.trim() !== "";
+    formData.fileName.trim() !== "" &&
+    formData.isTermsChecked === true;
 
   const [paperSize, setPaperSize] = useState("thermal80");
 
@@ -236,9 +238,8 @@ export default function ReceiptGenerator() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-800">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* ========================================================================= */}
+        
         {/* LEFT COLUMN - INPUT CONTROLS                                              */}
-        {/* ========================================================================= */}
         <div className="lg:col-span-7 space-y-6 bg-white p-6 rounded-lg border border-gray-200 shadow-sm font-lato">
           {/* Design Variant Field Group */}
           <fieldset className="border border-[#555] rounded-[10px] p-4 relative">
@@ -705,6 +706,8 @@ export default function ReceiptGenerator() {
               <label className="flex items-center space-x-2 text-sm ">
                 <input
                   type="checkbox"
+                  checked={formData.isTermsChecked}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isTermsChecked: e.target.checked }))}
                   defaultChecked
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
@@ -764,9 +767,7 @@ export default function ReceiptGenerator() {
           </div>
         </div>
 
-        {/* ========================================================================= */}
         {/* RIGHT COLUMN - REAL TIME LIVE PREVIEW WRAPPER                              */}
-        {/* ========================================================================= */}
         <div className="md:sticky md:top-2 self-start lg:col-span-5 flex flex-col items-center font-montserrat">
           <div className="w-full text-left mb-3">
             <h3 className="text-sm font-semibold text-gray-500">

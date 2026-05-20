@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+
+.form-control{
+   @apply block w-full text-sm leading-3 text-[#212529] bg-white border border-[#dee2e6] rounded-md
+    p-1.5 focus:outline-none  focus:ring-4 focus:ring-[#86b7fe]/70
+}
+.font-lato {
+  font-family: 'Lato', sans-serif;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}

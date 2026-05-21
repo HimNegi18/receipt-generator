@@ -191,43 +191,74 @@ export default function ReceiptGenerator() {
 
   //PDF Compilation & Download Engine Engine
   const downloadPDF = async () => {
-    const element = receiptRef.current;
-    if (!element) return;
+  const element = receiptRef.current;
+  if (!element) return;
 
-    try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        // ✅ Capture only the exact receipt element size
-        width: element.offsetWidth,
-        height: element.offsetHeight,
-        windowWidth: element.offsetWidth,
-        windowHeight: element.offsetHeight,
-      });
+  try {
+    await document.fonts.ready;
 
-      const imgData = canvas.toDataURL("image/png");
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+      windowWidth: element.offsetWidth,
+      windowHeight: element.offsetHeight,
+      onclone: (clonedDoc) => {
+        const clonedReceipt = clonedDoc.querySelector('[data-receipt]');
+        if (clonedReceipt) {
+          clonedDoc.querySelectorAll('[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3').forEach(el => {
+            el.style.margin = '0';
+          });
+        }
+      }
+    });
 
-      const sizeMap = {
-        thermal80: 80,
-        a4: 210,
-        a3: 297,
-      };
+    const imgData = canvas.toDataURL("image/png");
 
-      const pdfWidth = sizeMap[paperSize] || 80;
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const sizeMap = {
+      thermal80: 80,
+      a4: 210,
+      a3: 297,
+    };
 
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [pdfWidth, pdfHeight],
-      });
+    const pdfWidth = sizeMap[paperSize] || 80;
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${formData.fileName || "receipt"}.pdf`);
-    } catch (error) {
-      console.error("PDF generation failed:", error);
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [pdfWidth, pdfHeight],
+    });
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+    // ✅ Mobile-safe download
+    const pdfBlob = pdf.output("blob");
+    const blobUrl = URL.createObjectURL(pdfBlob);
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // ✅ On mobile open in new tab — user can then save from browser
+      window.open(blobUrl, "_blank");
+    } else {
+      // ✅ On desktop trigger normal download
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${formData.fileName || "receipt"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
     }
-  };
+
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+  }
+};
+
   // Date formatting parser helper
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return "";

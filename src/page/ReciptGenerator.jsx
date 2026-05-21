@@ -209,6 +209,13 @@ export default function ReceiptGenerator() {
         scrollX: -window.scrollX,
         scrollY: -window.scrollY,
         onclone: (clonedDoc) => {
+          // ✅ Remove ALL stylesheets from clone — receipt uses inline styles only
+          // This kills oklch at the source
+          const styles = clonedDoc.querySelectorAll(
+            'style, link[rel="stylesheet"]',
+          );
+          styles.forEach((s) => s.remove());
+
           const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
           if (clonedReceipt) {
             clonedReceipt.style.width = "320px";
@@ -218,23 +225,19 @@ export default function ReceiptGenerator() {
             clonedReceipt.style.color = "#111111";
             clonedReceipt.style.fontFamily = "'Lato', sans-serif";
 
-            // ✅ Strip all oklch colors from every element
             clonedDoc.querySelectorAll("[data-receipt] *").forEach((el) => {
-              const computed = window.getComputedStyle(el);
-
-              if (computed.backgroundColor.includes("oklch")) {
-                el.style.backgroundColor = "transparent";
-              }
-              if (computed.color.includes("oklch")) {
-                el.style.color = "#111111";
-              }
-              if (computed.borderColor.includes("oklch")) {
-                el.style.borderColor = "#e5e7eb";
-              }
-              if (el.tagName.match(/^(P|H1|H2|H3)$/)) {
-                el.style.margin = "0";
-              }
+              el.style.margin = el.style.margin || "0";
+              el.style.boxSizing = "border-box";
             });
+
+            clonedDoc
+              .querySelectorAll(
+                "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
+              )
+              .forEach((el) => {
+                el.style.margin = "0";
+                el.style.padding = "0";
+              });
           }
         },
       });

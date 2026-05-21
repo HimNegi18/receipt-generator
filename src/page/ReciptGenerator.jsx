@@ -239,25 +239,18 @@ export default function ReceiptGenerator() {
 
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
 
-      // ✅ Mobile-safe download
+      // ✅ Works on both mobile and desktop
       const pdfBlob = pdf.output("blob");
       const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.target = "_blank";   // ✅ required for iOS Safari
+      link.download = `${formData.fileName || "receipt"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000); // ✅ delay revoke for mobile
 
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-      if (isMobile) {
-        // ✅ Use data URI instead of blob URL — not blocked by mobile browsers
-        const pdfData = pdf.output("datauristring");
-        window.open(pdfData, "_blank");
-      } else {
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = `${formData.fileName || "receipt"}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(blobUrl);
-      }
     } catch (error) {
       console.error("PDF generation failed:", error);
     }

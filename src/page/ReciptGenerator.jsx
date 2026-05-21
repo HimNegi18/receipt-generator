@@ -173,6 +173,7 @@ export default function ReceiptGenerator() {
       currencySymbol: "₹",
       comment: "Thank you for visiting. We hope to serve you again soon.",
       fileName: "Restaurant Bill Template 1",
+      isTermsChecked: false,
     });
     setItems([
       {
@@ -746,7 +747,6 @@ export default function ReceiptGenerator() {
                       isTermsChecked: e.target.checked,
                     }))
                   }
-                  defaultChecked
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <p>

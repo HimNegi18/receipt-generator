@@ -192,86 +192,83 @@ export default function ReceiptGenerator() {
 
   //PDF Compilation & Download Engine Engine
   const downloadPDF = async () => {
-  const element = receiptRef.current;
-  if (!element) return;
+    const element = receiptRef.current;
+    if (!element) return;
 
-  try {
-    await document.fonts.ready;
+    try {
+      await document.fonts.ready;
 
-    // 1. FIXED: Set clear, standard, explicit dimensional overrides for html2canvas
-    // This forces the rendering engine to render the receipt at its full native size,
-    // even if it is currently scaled down or hidden inside a responsive mobile layout.
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: 380, // Force the native width layout box of the thermal receipt template
-      windowHeight: element.scrollHeight, // Capture full scrolling height
-      onclone: (clonedDoc) => {
-        const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
-        if (clonedReceipt) {
-          clonedDoc
-            .querySelectorAll(
-              "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
-            )
-            .forEach((el) => {
-              el.style.margin = "0";
-            });
-        }
-      },
-    });
+      // ✅ Scroll to top before capture so nothing is cut off
+      window.scrollTo(0, 0);
 
-    const imgData = canvas.toDataURL("image/png");
+      const canvas = await html2canvas(element, {
+        scale: 3, // higher scale = sharper on mobile
+        useCORS: true,
+        allowTaint: true,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        width: element.offsetWidth, // ✅ exact receipt width (320px)
+        height: element.offsetHeight, // ✅ exact receipt height
+        windowWidth: element.offsetWidth,
+        windowHeight: element.offsetHeight,
+        onclone: (clonedDoc) => {
+          const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
+          if (clonedReceipt) {
+            // ✅ Force exact same dimensions on the clone
+            clonedReceipt.style.width = element.offsetWidth + "px";
+            clonedReceipt.style.position = "relative";
+            clonedReceipt.style.margin = "0";
+            clonedDoc
+              .querySelectorAll(
+                "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
+              )
+              .forEach((el) => {
+                el.style.margin = "0";
+              });
+          }
+        },
+      });
 
-    const sizeMap = {
-      thermal80: 80,
-      a4: 210,
-      a3: 297,
-    };
+      const imgData = canvas.toDataURL("image/png");
 
-    const pdfWidth = sizeMap[paperSize] || 80;
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const sizeMap = {
+        thermal80: 80,
+        a4: 210,
+        a3: 297,
+      };
 
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [pdfWidth, pdfHeight],
-    });
+      const pdfWidth = sizeMap[paperSize] || 80;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [pdfWidth, pdfHeight],
+      });
 
-    const pdfBlob = pdf.output("blob");
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    
-    // 2. CRITICAL MOBILE SAFARI FIX: 
-    // If saving directly as a file fails via the 'download' attribute on a mobile browser, 
-    // setting rel="opener" combined with target="_blank" forces iOS Safari/Chrome to safely 
-    // open the PDF directly in a clear view window where users can tap "Save to Files".
-    link.target = "_blank";   
-    link.rel = "opener"; 
-    link.download = `${formData.fileName || "receipt"}.pdf`;
-    
-    document.body.appendChild(link);
-    link.click();
-    
-    // 3. CLEANUP TIMEOUT
-    // Move the node removal inside a short timeout alongside the object URL revocation.
-    // Real mobile devices process events slower than desktop machines; removing the element
-    // immediately can cancel the operation before the system handles the tap.
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    }, 3000); 
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
 
-  } catch (error) {
-    console.error("PDF generation failed:", error);
-  }
-};
+      // ✅ Universal download — works on desktop + Android + iOS
+      const pdfBlob = pdf.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.download = `${formData.fileName || "receipt"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      }, 3000);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      alert("PDF generation failed. Please try again.");
+    }
+  };
 
   // Date formatting parser helper
   const formatDisplayDate = (dateStr) => {

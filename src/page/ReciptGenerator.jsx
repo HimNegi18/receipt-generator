@@ -191,72 +191,87 @@ export default function ReceiptGenerator() {
   };
 
   //PDF Compilation & Download Engine Engine
-  const downloadPDF = async () => {
-    const element = receiptRef.current;
-    if (!element) return;
+ const downloadPDF = async () => {
+  const element = receiptRef.current;
+  if (!element) return;
 
-    try {
-      await document.fonts.ready;
+  try {
+    await document.fonts.ready;
 
-      // ✅ Scroll to top before capture so nothing is cut off
-      window.scrollTo(0, 0);
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-      const canvas = await html2canvas(element, {
-        scale: 3, // higher scale = sharper on mobile
-        useCORS: true,
-        allowTaint: true,
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-        width: element.offsetWidth, // ✅ exact receipt width (320px)
-        height: element.offsetHeight, // ✅ exact receipt height
-        windowWidth: element.offsetWidth,
-        windowHeight: element.offsetHeight,
-        onclone: (clonedDoc) => {
-          const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
-          if (clonedReceipt) {
-            // ✅ Force exact same dimensions on the clone
-            clonedReceipt.style.width = element.offsetWidth + "px";
-            clonedReceipt.style.position = "relative";
-            clonedReceipt.style.margin = "0";
-            clonedDoc
-              .querySelectorAll(
-                "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
-              )
-              .forEach((el) => {
-                el.style.margin = "0";
-              });
-          }
-        },
-      });
+    const canvas = await html2canvas(element, {
+      scale: isMobile ? 2 : 3, // ✅ lower scale on mobile — less memory
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      removeContainer: true,
+      scrollX: -window.scrollX,
+      scrollY: -window.scrollY,
+      onclone: (clonedDoc) => {
+        const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
+        if (clonedReceipt) {
+          clonedReceipt.style.width = "320px";
+          clonedReceipt.style.margin = "0";
+          clonedReceipt.style.padding = "24px";
+          clonedReceipt.style.backgroundColor = "#ffffff";
+          clonedDoc
+            .querySelectorAll(
+              "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
+            )
+            .forEach((el) => {
+              el.style.margin = "0";
+              el.style.padding = el.style.padding || "0";
+            });
+        }
+      },
+    });
 
-      const imgData = canvas.toDataURL("image/png");
+    const imgData = canvas.toDataURL("image/png");
 
-      const sizeMap = {
-        thermal80: 80,
-        a4: 210,
-        a3: 297,
-      };
+    const sizeMap = {
+      thermal80: 80,
+      a4: 210,
+      a3: 297,
+    };
 
-      const pdfWidth = sizeMap[paperSize] || 80;
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdfWidth = sizeMap[paperSize] || 80;
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [pdfWidth, pdfHeight],
-      });
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [pdfWidth, pdfHeight],
+    });
 
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
 
-      // ✅ Universal download — works on desktop + Android + iOS
+    if (isMobile) {
+      // ✅ On mobile — open as data URI in new tab, user saves from there
+      const pdfOutput = pdf.output("datauristring");
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(
+          `<html><head><title>Receipt</title></head>
+          <body style="margin:0;padding:0;">
+            <iframe width="100%" height="100%" style="border:none;position:fixed;top:0;left:0;bottom:0;right:0;" 
+              src="${pdfOutput}"></iframe>
+          </body></html>`
+        );
+        newWindow.document.close();
+      } else {
+        // Popup was blocked — fallback to direct link
+        const link = document.createElement("a");
+        link.href = pdfOutput;
+        link.target = "_blank";
+        link.click();
+      }
+    } else {
+      // ✅ Desktop — normal blob download
       const pdfBlob = pdf.output("blob");
       const blobUrl = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.target = "_blank";
-      link.rel = "noopener";
       link.download = `${formData.fileName || "receipt"}.pdf`;
       document.body.appendChild(link);
       link.click();
@@ -264,11 +279,13 @@ export default function ReceiptGenerator() {
         document.body.removeChild(link);
         URL.revokeObjectURL(blobUrl);
       }, 3000);
-    } catch (error) {
-      console.error("PDF generation failed:", error);
-      alert("PDF generation failed. Please try again.");
     }
-  };
+
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+    alert("Error: " + error.message); // ✅ shows exact error so you can debug
+  }
+};
 
   // Date formatting parser helper
   const formatDisplayDate = (dateStr) => {

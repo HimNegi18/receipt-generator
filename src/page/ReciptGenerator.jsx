@@ -262,27 +262,22 @@ export default function ReceiptGenerator() {
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
 
       if (isMobile) {
-        // ✅ On mobile — open as data URI in new tab, user saves from there
-        const pdfOutput = pdf.output("datauristring");
-        const newWindow = window.open();
-        if (newWindow) {
-          newWindow.document.write(
-            `<html><head><title>Receipt</title></head>
-          <body style="margin:0;padding:0;">
-            <iframe width="100%" height="100%" style="border:none;position:fixed;top:0;left:0;bottom:0;right:0;" 
-              src="${pdfOutput}"></iframe>
-          </body></html>`,
-          );
-          newWindow.document.close();
-        } else {
-          // Popup was blocked — fallback to direct link
-          const link = document.createElement("a");
-          link.href = pdfOutput;
-          link.target = "_blank";
-          link.click();
-        }
+        // ✅ Direct blob URL — no document.write, no blank tab
+        const pdfBlob = pdf.output("blob");
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.download = `${formData.fileName || "receipt"}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }, 3000);
       } else {
-        // ✅ Desktop — normal blob download
+        // desktop — same as before
         const pdfBlob = pdf.output("blob");
         const blobUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement("a");

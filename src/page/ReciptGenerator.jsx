@@ -192,109 +192,122 @@ export default function ReceiptGenerator() {
 
   //PDF Compilation & Download Engine Engine
   const downloadPDF = async () => {
-    const element = receiptRef.current;
-    if (!element) return;
+  const element = receiptRef.current;
+  if (!element) return;
 
-    try {
-      await document.fonts.ready;
+  try {
+    await document.fonts.ready;
 
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isMobile = isIOS || isAndroid;
 
-      const canvas = await html2canvas(element, {
-        scale: isMobile ? 2 : 3, // ✅ lower scale on mobile — less memory
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        removeContainer: true,
-        scrollX: -window.scrollX,
-        scrollY: -window.scrollY,
-        onclone: (clonedDoc) => {
-          // ✅ Remove ALL stylesheets from clone — receipt uses inline styles only
-          // This kills oklch at the source
-          const styles = clonedDoc.querySelectorAll(
-            'style, link[rel="stylesheet"]',
-          );
-          styles.forEach((s) => s.remove());
+    const canvas = await html2canvas(element, {
+      scale: isMobile ? 1.5 : 3,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      removeContainer: true,
+      scrollX: -window.scrollX,
+      scrollY: -window.scrollY,
+      onclone: (clonedDoc) => {
+        // ✅ Remove ALL stylesheets — kills oklch at source
+        clonedDoc
+          .querySelectorAll('style, link[rel="stylesheet"]')
+          .forEach((s) => s.remove());
 
-          const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
-          if (clonedReceipt) {
-            clonedReceipt.style.width = "320px";
-            clonedReceipt.style.margin = "0";
-            clonedReceipt.style.padding = "24px";
-            clonedReceipt.style.backgroundColor = "#ffffff";
-            clonedReceipt.style.color = "#111111";
-            clonedReceipt.style.fontFamily = "'Lato', sans-serif";
+        const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
+        if (clonedReceipt) {
+          clonedReceipt.style.width = "320px";
+          clonedReceipt.style.margin = "0";
+          clonedReceipt.style.padding = "24px";
+          clonedReceipt.style.backgroundColor = "#ffffff";
+          clonedReceipt.style.color = "#111111";
+          clonedReceipt.style.fontFamily = "'Lato', sans-serif";
 
-            clonedDoc.querySelectorAll("[data-receipt] *").forEach((el) => {
-              el.style.margin = el.style.margin || "0";
-              el.style.boxSizing = "border-box";
+          clonedDoc.querySelectorAll("[data-receipt] *").forEach((el) => {
+            el.style.boxSizing = "border-box";
+          });
+
+          clonedDoc
+            .querySelectorAll(
+              "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
+            )
+            .forEach((el) => {
+              el.style.margin = "0";
+              el.style.padding = "0";
             });
+        }
+      },
+    });
 
-            clonedDoc
-              .querySelectorAll(
-                "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
-              )
-              .forEach((el) => {
-                el.style.margin = "0";
-                el.style.padding = "0";
-              });
-          }
-        },
-      });
+    const imgData = canvas.toDataURL("image/png");
 
-      const imgData = canvas.toDataURL("image/png");
+    const sizeMap = { thermal80: 80, a4: 210, a3: 297 };
+    const pdfWidth = sizeMap[paperSize] || 80;
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      const sizeMap = {
-        thermal80: 80,
-        a4: 210,
-        a3: 297,
-      };
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [pdfWidth, pdfHeight],
+    });
 
-      const pdfWidth = sizeMap[paperSize] || 80;
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
 
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [pdfWidth, pdfHeight],
-      });
+    const fileName = `${formData.fileName || "receipt"}.pdf`;
 
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    if (isIOS) {
+      // ✅ iOS Safari — data URI is the only reliable way
+      const pdfBase64 = pdf.output("datauristring");
+      window.location.href = pdfBase64;
 
-      if (isMobile) {
-        // ✅ Direct blob URL — no document.write, no blank tab
-        const pdfBlob = pdf.output("blob");
-        const blobUrl = URL.createObjectURL(pdfBlob);
+    } else if (isAndroid) {
+      // ✅ Android Chrome — fetch blob approach
+      const pdfBlob = pdf.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      try {
+        const response = await fetch(blobUrl);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(
+          new Blob([blob], { type: "application/pdf" }),
+        );
         const link = document.createElement("a");
-        link.href = blobUrl;
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.download = `${formData.fileName || "receipt"}.pdf`;
+        link.href = url;
+        link.download = fileName;
+        link.style.display = "none";
         document.body.appendChild(link);
         link.click();
         setTimeout(() => {
           document.body.removeChild(link);
+          URL.revokeObjectURL(url);
           URL.revokeObjectURL(blobUrl);
         }, 3000);
-      } else {
-        // desktop — same as before
-        const pdfBlob = pdf.output("blob");
-        const blobUrl = URL.createObjectURL(pdfBlob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = `${formData.fileName || "receipt"}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(blobUrl);
-        }, 3000);
+      } catch {
+        // Android fallback
+        window.open(blobUrl, "_blank");
       }
-    } catch (error) {
-      console.error("PDF generation failed:", error);
-      alert("Error: " + error.message); // ✅ shows exact error so you can debug
+
+    } else {
+      // ✅ Desktop
+      const pdfBlob = pdf.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      }, 3000);
     }
-  };
+
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+    alert("Error: " + error.message);
+  }
+};
 
   // Date formatting parser helper
   const formatDisplayDate = (dateStr) => {

@@ -30,7 +30,7 @@ export default function ReceiptGenerator() {
     currencySymbol: "₹",
     comment: "Thank you for visiting. We hope to serve you again soon.",
     fileName: "Restaurant Bill Template 1",
-    isTermsChecked: true
+    isTermsChecked: true,
   });
 
   // Dynamic Items list state
@@ -191,73 +191,76 @@ export default function ReceiptGenerator() {
 
   //PDF Compilation & Download Engine Engine
   const downloadPDF = async () => {
-  const element = receiptRef.current;
-  if (!element) return;
+    const element = receiptRef.current;
+    if (!element) return;
 
-  try {
-    await document.fonts.ready;
+    try {
+      await document.fonts.ready;
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      width: element.offsetWidth,
-      height: element.offsetHeight,
-      windowWidth: element.offsetWidth,
-      windowHeight: element.offsetHeight,
-      onclone: (clonedDoc) => {
-        const clonedReceipt = clonedDoc.querySelector('[data-receipt]');
-        if (clonedReceipt) {
-          clonedDoc.querySelectorAll('[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3').forEach(el => {
-            el.style.margin = '0';
-          });
-        }
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+        windowWidth: element.offsetWidth,
+        windowHeight: element.offsetHeight,
+        onclone: (clonedDoc) => {
+          const clonedReceipt = clonedDoc.querySelector("[data-receipt]");
+          if (clonedReceipt) {
+            clonedDoc
+              .querySelectorAll(
+                "[data-receipt] p, [data-receipt] h1, [data-receipt] h2, [data-receipt] h3",
+              )
+              .forEach((el) => {
+                el.style.margin = "0";
+              });
+          }
+        },
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const sizeMap = {
+        thermal80: 80,
+        a4: 210,
+        a3: 297,
+      };
+
+      const pdfWidth = sizeMap[paperSize] || 80;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [pdfWidth, pdfHeight],
+      });
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+      // ✅ Mobile-safe download
+      const pdfBlob = pdf.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // ✅ Use data URI instead of blob URL — not blocked by mobile browsers
+        const pdfData = pdf.output("datauristring");
+        window.open(pdfData, "_blank");
+      } else {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `${formData.fileName || "receipt"}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
       }
-    });
-
-    const imgData = canvas.toDataURL("image/png");
-
-    const sizeMap = {
-      thermal80: 80,
-      a4: 210,
-      a3: 297,
-    };
-
-    const pdfWidth = sizeMap[paperSize] || 80;
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [pdfWidth, pdfHeight],
-    });
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-
-    // ✅ Mobile-safe download
-    const pdfBlob = pdf.output("blob");
-    const blobUrl = URL.createObjectURL(pdfBlob);
-
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // ✅ On mobile open in new tab — user can then save from browser
-      window.open(blobUrl, "_blank");
-    } else {
-      // ✅ On desktop trigger normal download
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = `${formData.fileName || "receipt"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
     }
-
-  } catch (error) {
-    console.error("PDF generation failed:", error);
-  }
-};
+  };
 
   // Date formatting parser helper
   const formatDisplayDate = (dateStr) => {
@@ -269,7 +272,6 @@ export default function ReceiptGenerator() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-gray-800">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
         {/* LEFT COLUMN - INPUT CONTROLS                                              */}
         <div className="lg:col-span-7 space-y-6 bg-white p-6 rounded-lg border border-gray-200 shadow-sm font-lato">
           {/* Design Variant Field Group */}
@@ -738,7 +740,12 @@ export default function ReceiptGenerator() {
                 <input
                   type="checkbox"
                   checked={formData.isTermsChecked}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, isTermsChecked: e.target.checked }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isTermsChecked: e.target.checked,
+                    }))
+                  }
                   defaultChecked
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
@@ -760,7 +767,7 @@ export default function ReceiptGenerator() {
               type="button"
               onClick={downloadPDF}
               disabled={!isFormValid}
-              className={`flex items-center gap-2 bg-blue-500 hover:bg-blue-600 ${ isFormValid ? "cursor-pointer": "cursor-not-allowed opacity-60"}
+              className={`flex items-center gap-2 bg-blue-500 hover:bg-blue-600 ${isFormValid ? "cursor-pointer" : "cursor-not-allowed opacity-60"}
               text-white font-medium text-sm py-2.5 px-5 rounded-md shadow transition-colors`}
             >
               <Download size={16} />
